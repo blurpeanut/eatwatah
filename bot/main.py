@@ -4,7 +4,7 @@ import sys
 import traceback
 
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 # Ensure project root is on sys.path when running bot/main.py directly
@@ -24,6 +24,7 @@ from bot.handlers.delete_account import (
     delete_account_confirm,
     delete_account_handler,
 )
+from bot.handlers.help import help_callback, help_handler
 from bot.handlers.start import curated_add_callback, quick_action_callback, start_handler
 from bot.handlers.view_visited import view_visited_handler
 from bot.handlers.view_wishlist import view_wishlist_handler
@@ -44,6 +45,17 @@ logger = logging.getLogger(__name__)
 
 async def post_init(application: Application) -> None:
     await test_connection()
+    await application.bot.set_my_commands([
+        BotCommand("start",         "Get started / see your stats"),
+        BotCommand("help",          "How to use eatwatah"),
+        BotCommand("add",           "Save a food spot to your wishlist"),
+        BotCommand("viewwishlist",  "Browse your saved spots"),
+        BotCommand("visit",         "Log a meal with rating and review"),
+        BotCommand("viewvisited",   "See your visit history"),
+        BotCommand("ask",           "Get AI-powered food recommendations"),
+        BotCommand("delete",        "Remove a spot from your list"),
+        BotCommand("deleteaccount", "Delete your account"),
+    ])
     logger.info("eatwatah bot is up and running")
 
 
@@ -140,6 +152,7 @@ def main() -> None:
 
     # ── Command handlers ──────────────────────────────────────────────────────
     app.add_handler(CommandHandler("start",         start_handler))
+    app.add_handler(CommandHandler("help",          help_handler))
     app.add_handler(CommandHandler("viewwishlist",  view_wishlist_handler))
     app.add_handler(CommandHandler("viewvisited",   view_visited_handler))
     app.add_handler(CommandHandler("delete",        delete_handler))
@@ -150,6 +163,9 @@ def main() -> None:
     app.add_handler(add_conversation_handler)      # /add
     app.add_handler(note_conversation_handler)     # post_add:note: entry point
     app.add_handler(visit_conversation_handler)    # /visit + wl_visit: + post_add:visit: entry points
+
+    # ── Callback: /help flows ─────────────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(help_callback,         pattern=r"^help:"))
 
     # ── Callback: /start flows ────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(curated_add_callback,  pattern=r"^curated_add:"))
