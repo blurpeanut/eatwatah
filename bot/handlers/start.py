@@ -85,7 +85,8 @@ async def _send_new_user_welcome(update: Update, user) -> None:
         f"{name}! 👋 I'm eatwatah — your personal food kaki.\n\n"
         "Tell me spots you want to try, log your visits with ratings, and when you "
         "can't decide where to eat — just /ask me and I'll figure it out 😎\n\n"
-        "Here are some spots others are saving right now 👇 Tap any to add to your list:",
+        "Hit the menu button or use /help to see everything I can do.\n\n"
+        "For now, here are some spots others are saving right now 👇 Tap any to add to your list:",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     await update.message.reply_text(
