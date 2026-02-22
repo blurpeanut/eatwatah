@@ -1,6 +1,7 @@
 import asyncio
 import html
 import logging
+import re
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -21,12 +22,25 @@ _FOOD_KEYWORDS = {
     "where", "near", "cheap", "budget", "atas", "good", "best", "try",
     "drink", "cuisine", "western", "chinese", "japanese", "korean", "indian",
     "thai", "malay", "halal", "vegetarian", "vegan",
+    # vibe / atmosphere words
+    "cosy", "cozy", "chill", "romantic", "aesthetic", "lively", "quiet",
+    "casual", "fancy", "vibey", "instagrammable", "noisy",
+    # discovery intent
+    "spot", "spots", "something", "anywhere", "area", "vibes",
 }
+
+# Matches "in Bugis", "in the East", "in town" — strong signal for place-seeking
+_LOCATION_PATTERN = re.compile(r"\bin\s+\w", re.IGNORECASE)
 
 
 def _is_food_query(text: str) -> bool:
     lower = text.lower()
-    return any(kw in lower for kw in _FOOD_KEYWORDS)
+    if any(kw in lower for kw in _FOOD_KEYWORDS):
+        return True
+    # "... in Bugis", "... in Tanjong Pagar" etc. are clearly place-seeking
+    if _LOCATION_PATTERN.search(text):
+        return True
+    return False
 
 
 # ── /ask command ──────────────────────────────────────────────────────────────
