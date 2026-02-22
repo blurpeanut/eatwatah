@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update as sa_update
 from sqlalchemy.exc import IntegrityError
@@ -113,6 +114,28 @@ async def get_user_display_names(telegram_ids: list[str]) -> dict[str, str]:
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
+
+async def get_admin_stats() -> dict:
+    """Global stats across all users and chats. For admin use only."""
+    async with AsyncSessionLocal() as session:
+        try:
+            total_users    = await session.scalar(select(func.count(User.id)).where(User.is_deleted == False))
+            total_chats    = await session.scalar(select(func.count(Chat.id)))
+            total_wishlist = await session.scalar(select(func.count(WishlistEntry.id)).where(WishlistEntry.status != "deleted"))
+            total_visits   = await session.scalar(select(func.count(Visit.id)))
+            recent_errors  = await session.scalar(
+                select(func.count(Error.id)).where(Error.timestamp >= datetime.now(timezone.utc) - timedelta(hours=24))
+            )
+            return {
+                "users":      total_users   or 0,
+                "chats":      total_chats   or 0,
+                "wishlist":   total_wishlist or 0,
+                "visits":     total_visits  or 0,
+                "errors_24h": recent_errors or 0,
+            }
+        finally:
+            await session.close()
+
 
 async def get_chat_stats(chat_id: int | str) -> tuple[int, int]:
     """Return (total_saved, visited_count) for a chat. Returns (0, 0) on error."""

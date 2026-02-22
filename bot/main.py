@@ -25,6 +25,7 @@ from bot.handlers.delete_account import (
     delete_account_handler,
 )
 from bot.handlers.help import help_callback, help_handler
+from bot.handlers.stats import stats_handler
 from bot.handlers.start import curated_add_callback, quick_action_callback, start_handler
 from bot.handlers.view_visited import view_visited_handler
 from bot.handlers.view_wishlist import view_wishlist_handler
@@ -153,6 +154,7 @@ def main() -> None:
     # ── Command handlers ──────────────────────────────────────────────────────
     app.add_handler(CommandHandler("start",         start_handler))
     app.add_handler(CommandHandler("help",          help_handler))
+    app.add_handler(CommandHandler("stats",         stats_handler))
     app.add_handler(CommandHandler("viewwishlist",  view_wishlist_handler))
     app.add_handler(CommandHandler("viewvisited",   view_visited_handler))
     app.add_handler(CommandHandler("delete",        delete_handler))
