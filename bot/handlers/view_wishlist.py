@@ -2,6 +2,8 @@ import html
 import logging
 import os
 
+import httpx
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Chat, Update, WebAppInfo
 from telegram.ext import ContextTypes
 
@@ -83,6 +85,24 @@ def _build_static_map_url(entries, width: int = 600, height: int = 300) -> str |
     return url if len(url) <= 8192 else None
 
 
+async def _fetch_static_map(url: str) -> bytes | None:
+    """Download the static map image from Google server-side.
+
+    Avoids giving Telegram the raw URL (which fails when the API key has
+    referrer/IP restrictions, as Telegram's servers are not whitelisted).
+    Returns image bytes on success, None on any error.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+        if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
+            return resp.content
+        logger.warning("Static map fetch returned %s %s", resp.status_code, resp.headers.get("content-type"))
+    except Exception as e:
+        logger.warning("Static map fetch error: %s", e)
+    return None
+
+
 def _get_region(area: str | None) -> str:
     if not area:
         return "Other"
@@ -125,15 +145,17 @@ async def show_wishlist(message: Message, chat, user) -> None:
 
             static_map_url = _build_static_map_url(entries)
             if static_map_url:
-                try:
-                    await message.reply_photo(
-                        photo=static_map_url,
-                        caption=caption,
-                        reply_markup=keyboard,
-                    )
-                    return
-                except Exception as e:
-                    logger.warning("Static map photo failed (Maps Static API enabled?): %s", e)
+                image_bytes = await _fetch_static_map(static_map_url)
+                if image_bytes:
+                    try:
+                        await message.reply_photo(
+                            photo=image_bytes,
+                            caption=caption,
+                            reply_markup=keyboard,
+                        )
+                        return
+                    except Exception as e:
+                        logger.warning("Static map reply_photo failed: %s", e)
 
             await message.reply_text(caption, reply_markup=keyboard)
             return
