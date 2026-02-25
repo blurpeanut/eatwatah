@@ -50,6 +50,7 @@ class WishlistEntry(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     address: Mapped[str] = mapped_column(String, nullable=False)
     area: Mapped[str | None] = mapped_column(String, nullable=True)
+    cuisine_type: Mapped[str | None] = mapped_column(String, nullable=True)
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     added_by: Mapped[str] = mapped_column(String, nullable=False)  # FK: users.telegram_id

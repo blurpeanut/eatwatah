@@ -78,7 +78,7 @@ async def ask_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     hold = await update.message.reply_text("Hmm let me think... 🤔")
 
     try:
-        results, source_labels, has_history = await asyncio.wait_for(
+        results, source_labels, _ = await asyncio.wait_for(
             get_recommendations(query_text, chat.id, user.id),
             timeout=_AI_TIMEOUT,
         )
@@ -130,14 +130,3 @@ async def ask_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
-
-    # Footer message
-    if not has_history:
-        await update.message.reply_text(
-            "The more you log with /visit, the smarter I get 👀 "
-            "Start with /add to build your list!"
-        )
-    else:
-        await update.message.reply_text(
-            "Ask me anything — near Orchard, good for dates, open now, whatever! 😄"
-        )

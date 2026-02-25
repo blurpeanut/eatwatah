@@ -3,7 +3,12 @@ import os
 import sys
 import traceback
 
+# Load env file before any other imports so all modules see the correct values.
+# services/places_service.py also calls load_dotenv() — if it ran first it would
+# load .env, and a later load_dotenv(".env.dev") would not override already-set vars.
 from dotenv import load_dotenv
+load_dotenv(os.getenv("ENV_FILE", ".env"), override=True)
+
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -32,8 +37,6 @@ from bot.handlers.view_wishlist import view_wishlist_handler
 from bot.handlers.visit import visit_conversation_handler
 from db.connection import test_connection
 from db.helpers import log_error
-
-load_dotenv()
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -136,7 +139,13 @@ async def unhandled_callback(update: Update, context) -> None:
     )
 
 
-def main() -> None:
+def build_app() -> Application:
+    """Build and return the configured PTB Application.
+
+    Extracted from main() so start.py can run the bot alongside FastAPI
+    in the same asyncio event loop without calling run_polling() (which
+    blocks and creates its own loop).
+    """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in environment")
@@ -192,6 +201,12 @@ def main() -> None:
     # ── Catch-all (must be last) ──────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(unhandled_callback))
 
+    return app
+
+
+def main() -> None:
+    """Run the bot standalone (without FastAPI). Used for local bot-only runs."""
+    app = build_app()
     logger.info("Starting bot — press Ctrl+C to stop")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

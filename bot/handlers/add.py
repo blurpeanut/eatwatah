@@ -24,7 +24,7 @@ from db.helpers import (
     save_note,
     save_wishlist_entry,
 )
-from services.places_service import search_places
+from services.places_service import classify_cuisine, reverse_geocode_area, search_places
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +178,14 @@ async def place_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
         return ConversationHandler.END
 
+    # Derive area via reverse geocoding; classify cuisine from Places types
+    lat, lng = place.get("lat"), place.get("lng")
+    if lat is not None and lng is not None:
+        area = await reverse_geocode_area(lat, lng)
+    else:
+        area = place.get("area")
+    cuisine_type = classify_cuisine(place.get("types", []))
+
     # Check first-ever add before saving
     first_add = await is_first_ever_add(user.id)
 
@@ -187,10 +195,11 @@ async def place_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         google_place_id=place["place_id"],
         name=place["name"],
         address=place["address"],
-        area=place["area"],
-        lat=place["lat"],
-        lng=place["lng"],
+        area=area,
+        lat=lat,
+        lng=lng,
         any_branch=any_branch,
+        cuisine_type=cuisine_type,
     )
 
     if not entry:
@@ -208,7 +217,7 @@ async def place_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     if first_add:
         await query.edit_message_text(
             f"Added <b>{name_label}</b> to your wishlist! 🔖\n\n"
-            "First one in the bag! 🎉 The more you add and review, the smarter my recs get 👀",
+            "First one in the bag! 🎉 The more you log, the smarter /ask gets 🧠",
             parse_mode="HTML",
             reply_markup=follow_ups,
         )
@@ -284,7 +293,7 @@ async def manual_input_received(update: Update, context: ContextTypes.DEFAULT_TY
     if first_add:
         await update.message.reply_html(
             f"Added <b>{escaped_name}</b> to your wishlist! 🔖\n\n"
-            "First one in the bag! 🎉 The more you add and review, the smarter my recs get 👀",
+            "First one in the bag! 🎉 The more you log, the smarter /ask gets 🧠",
             reply_markup=follow_ups,
         )
     else:

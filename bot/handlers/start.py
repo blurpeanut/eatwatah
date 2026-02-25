@@ -7,14 +7,13 @@ from telegram.ext import ContextTypes
 from db.context import is_private_chat
 from db.helpers import (
     ensure_user_and_chat,
-    get_chat_stats,
     is_duplicate_entry,
     is_first_ever_add,
     log_error,
     save_wishlist_entry,
 )
 from bot.handlers.view_wishlist import show_wishlist
-from services.places_service import search_places
+from services.places_service import classify_cuisine, reverse_geocode_area, search_places
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +60,10 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def _send_new_user_welcome(update: Update, user) -> None:
     name = html.escape(user.first_name or "friend")
+    await update.message.reply_html(
+        f"Welcome, {name}! 👋 Use /help to see everything I can do.\n\n"
+        "For starters, here are some spots others are saving right now 👇"
+    )
 
     keyboard = [
         [
@@ -81,37 +84,15 @@ async def _send_new_user_welcome(update: Update, user) -> None:
         ],
     ]
 
-    await update.message.reply_html(
-        f"{name}! 👋 I'm eatwatah — your personal food kaki.\n\n"
-        "Tell me spots you want to try, log your visits with ratings, and when you "
-        "can't decide where to eat — just /ask me and I'll figure it out 😎\n\n"
-        "Hit the menu button or use /help to see everything I can do.\n\n"
-        "For now, here are some spots others are saving right now 👇 Tap any to add to your list:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
     await update.message.reply_text(
-        "Or just tell me a place you've been meaning to try 👀 Use /add <place name>"
+        "Tap any to add to your list, or use /add <place name> to search for something specific 👀",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
 async def _send_returning_user_welcome(update: Update, user, chat) -> None:
-    name = html.escape(user.first_name or "friend")
-    is_private = is_private_chat(chat.id, user.id)
-    total_saved, visited_count = await get_chat_stats(chat.id)
-
-    list_label = "your list" if is_private else f"{html.escape(chat.title or 'this group')}'s list"
-
-    keyboard = [[
-        InlineKeyboardButton("➕ Add Place",      callback_data="quick:add"),
-        InlineKeyboardButton("🤖 Get Recs",       callback_data="quick:recs"),
-        InlineKeyboardButton("📋 View Wishlist",  callback_data="quick:wishlist"),
-    ]]
-
-    await update.message.reply_html(
-        f"{name}, welcome back! 👋\n\n"
-        f"📋 {total_saved} saved on {list_label} | ✅ {visited_count} visited\n\n"
-        "What's the plan today? 👇",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+    await update.message.reply_text(
+        "Hey, you're already all set! Try /help to see what I can do 😊"
     )
 
 
@@ -166,6 +147,14 @@ async def curated_add_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
+    # Derive area via reverse geocoding; classify cuisine from Places types
+    lat, lng = place.get("lat"), place.get("lng")
+    if lat is not None and lng is not None:
+        area = await reverse_geocode_area(lat, lng)
+    else:
+        area = place.get("area")
+    cuisine_type = classify_cuisine(place.get("types", []))
+
     # Check first-ever add before saving
     first_add = await is_first_ever_add(user.id)
 
@@ -175,9 +164,10 @@ async def curated_add_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         google_place_id=place["place_id"],
         name=place["name"],
         address=place["address"],
-        area=place["area"],
-        lat=place["lat"],
-        lng=place["lng"],
+        area=area,
+        lat=lat,
+        lng=lng,
+        cuisine_type=cuisine_type,
     )
 
     if not entry:
@@ -192,7 +182,7 @@ async def curated_add_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if first_add:
         await query.edit_message_text(
             f"Added <b>{escaped_name}</b> to your wishlist! 🔖\n\n"
-            "First one in the bag! 🎉 The more you add and review, the smarter my recs get 👀",
+            "First one in the bag! 🎉 The more you log, the smarter /ask gets 🧠",
             parse_mode="HTML",
         )
     else:

@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>eatwatah</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg:           var(--tg-theme-bg-color, #ffffff);
+      --text:         var(--tg-theme-text-color, #000000);
+      --hint:         var(--tg-theme-hint-color, #999999);
+      --link:         var(--tg-theme-link-color, #2481cc);
+      --btn:          var(--tg-theme-button-color, #2481cc);
+      --btn-text:     var(--tg-theme-button-text-color, #ffffff);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+      --accent-orange: #FF6B35;
+      --accent-green:  #34A853;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Filter bar ─────────────────────────────────────────── */
+    #filter-bar {
+      flex-shrink: 0;
+      background: var(--bg);
+      padding: 8px 12px 6px;
+      border-bottom: 1px solid var(--secondary-bg);
+      z-index: 10;
+    }
+
+    #search-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    #search {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1.5px solid var(--secondary-bg);
+      border-radius: var(--radius);
+      background: var(--secondary-bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    #search::placeholder { color: var(--hint); }
+    #search:focus { border-color: var(--btn); }
+
+    #view-toggle {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--btn);
+      color: var(--btn-text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #cuisine-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      align-items: center;
+    }
+    #cuisine-row::-webkit-scrollbar { display: none; }
+
+    .pill {
+      flex-shrink: 0;
+      padding: 4px 12px;
+      border: 1.5px solid var(--secondary-bg);
+      border-radius: 99px;
+      background: var(--bg);
+      color: var(--hint);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pill.active {
+      background: var(--btn);
+      border-color: var(--btn);
+      color: var(--btn-text);
+    }
+
+    #area-filter {
+      flex-shrink: 0;
+      padding: 4px 10px;
+      border: 1.5px solid var(--secondary-bg);
+      border-radius: var(--radius);
+      background: var(--secondary-bg);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* ── Legend ─────────────────────────────────────────────── */
+    #legend {
+      flex-shrink: 0;
+      display: flex;
+      gap: 14px;
+      padding: 5px 14px;
+      background: var(--bg);
+      font-size: 12px;
+      color: var(--hint);
+      border-bottom: 1px solid var(--secondary-bg);
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    /* ── Map ─────────────────────────────────────────────────── */
+    #map {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── List view ───────────────────────────────────────────── */
+    #list-view {
+      flex: 1;
+      overflow-y: auto;
+      display: none;
+      padding: 12px;
+    }
+
+    .list-area-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--hint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 10px 4px 6px;
+    }
+
+    .list-item {
+      padding: 12px;
+      border-radius: var(--radius);
+      background: var(--secondary-bg);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .list-item:active { opacity: 0.7; }
+
+    .list-item-name {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .list-item-meta {
+      font-size: 13px;
+      color: var(--hint);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: var(--hint);
+      padding: 40px 20px;
+      font-size: 15px;
+    }
+
+    /* ── Slide-up card ───────────────────────────────────────── */
+    #card-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 100;
+      display: none;
+    }
+
+    #card {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      background: var(--bg);
+      border-radius: var(--radius) var(--radius) 0 0;
+      z-index: 101;
+      padding: 0 0 env(safe-area-inset-bottom, 16px);
+      max-height: 70vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      display: none;
+    }
+    #card.open {
+      display: block;
+      transform: translateY(0);
+    }
+
+    #card-handle {
+      width: 40px; height: 4px;
+      background: var(--secondary-bg);
+      border-radius: 2px;
+      margin: 10px auto 14px;
+    }
+
+    #card-content {
+      padding: 0 16px 20px;
+    }
+
+    #card-content h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .tag {
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: var(--secondary-bg);
+      font-size: 12px;
+      color: var(--hint);
+      font-weight: 500;
+    }
+    .tag.visited { background: #e8f5e9; color: #2e7d32; }
+    .tag.wishlist { background: #fff3e0; color: #e65100; }
+
+    .card-address {
+      font-size: 13px;
+      color: var(--hint);
+      margin-bottom: 10px;
+    }
+
+    .card-notes {
+      font-size: 14px;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: var(--secondary-bg);
+      border-radius: 8px;
+    }
+
+    .card-rating {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .card-review {
+      font-size: 14px;
+      color: var(--hint);
+      margin-top: 4px;
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    .maps-btn {
+      display: block;
+      text-align: center;
+      margin-top: 14px;
+      padding: 12px;
+      background: var(--btn);
+      color: var(--btn-text);
+      border-radius: var(--radius);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    /* ── Error / loading states ──────────────────────────────── */
+    #status-msg {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      gap: 12px;
+    }
+    #status-msg.visible { display: flex; }
+    #status-msg p { color: var(--hint); font-size: 15px; line-height: 1.5; }
+    #status-msg .emoji { font-size: 40px; }
+  </style>
+</head>
+
+<body>
+  <!-- Filter bar -->
+  <div id="filter-bar">
+    <div id="search-row">
+      <input id="search" type="search" placeholder="Search places..." autocomplete="off" />
+      <button id="view-toggle">☰ List</button>
+    </div>
+    <div id="cuisine-row">
+      <!-- Pills injected by JS -->
+    </div>
+  </div>
+
+  <!-- Pin legend -->
+  <div id="legend">
+    <span><span class="legend-dot" style="background:var(--accent-orange)"></span>Wishlist</span>
+    <span><span class="legend-dot" style="background:var(--accent-green)"></span>Visited</span>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- List view -->
+  <div id="list-view"></div>
+
+  <!-- Status / error / loading -->
+  <div id="status-msg">
+    <span class="emoji" id="status-emoji">🍜</span>
+    <p id="status-text">Loading your wishlist...</p>
+  </div>
+
+  <!-- Slide-up card overlay -->
+  <div id="card-overlay"></div>
+  <div id="card">
+    <div id="card-handle"></div>
+    <div id="card-content"></div>
+  </div>
+
+  <script>
+    // ── Telegram WebApp setup ─────────────────────────────────────────────────
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const initData = tg.initData;
+    const initDataUnsafe = tg.initDataUnsafe || {};
+    const chatInfo = initDataUnsafe.chat || {};
+    const userInfo = initDataUnsafe.user || {};
+    const chatId = String(chatInfo.id || userInfo.id || "");
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let allPlaces = [];
+    let cuisineFilter = "";
+    let areaFilter = "";
+    let isListView = false;
+    let map = null;
+    let markers = [];
+
+    // ── DOM helpers ───────────────────────────────────────────────────────────
+    function esc(str) {
+      const d = document.createElement("div");
+      d.textContent = str != null ? String(str) : "";
+      return d.innerHTML;
+    }
+
+    function showStatus(emoji, text) {
+      document.getElementById("map").style.display = "none";
+      document.getElementById("list-view").style.display = "none";
+      document.getElementById("legend").style.display = "none";
+      const el = document.getElementById("status-msg");
+      document.getElementById("status-emoji").textContent = emoji;
+      document.getElementById("status-text").textContent = text;
+      el.classList.add("visible");
+    }
+
+    function hideStatus() {
+      document.getElementById("status-msg").classList.remove("visible");
+      document.getElementById("legend").style.display = "";
+    }
+
+    // ── Data fetch ────────────────────────────────────────────────────────────
+    async function fetchWishlist() {
+      if (!chatId) {
+        showStatus("😕", "Couldn't identify your chat. Close and reopen from Telegram.");
+        return;
+      }
+
+      showStatus("🍜", "Loading your wishlist...");
+
+      try {
+        const resp = await fetch(`/api/wishlist?chat_id=${encodeURIComponent(chatId)}`, {
+          headers: { "X-Telegram-Init-Data": initData },
+        });
+
+        if (resp.status === 403) {
+          showStatus("🔒", "Session expired. Close and reopen from Telegram.");
+          return;
+        }
+        if (!resp.ok) {
+          showStatus("😅", "Something went wrong — try closing and reopening.");
+          return;
+        }
+
+        allPlaces = await resp.json();
+
+        if (!allPlaces.length) {
+          showStatus("📋", "Your wishlist is empty! Use /add in the bot to start saving places.");
+          return;
+        }
+
+        hideStatus();
+        buildFilters();
+        renderMap();
+
+      } catch (err) {
+        showStatus("😅", "Couldn't connect — check your internet and try again.");
+      }
+    }
+
+    // ── Filtering ─────────────────────────────────────────────────────────────
+    function getFiltered() {
+      const term = (document.getElementById("search").value || "").toLowerCase().trim();
+      return allPlaces.filter(p => {
+        const matchSearch = !term || p.name.toLowerCase().includes(term);
+        const matchCuisine = !cuisineFilter || p.cuisine_type === cuisineFilter;
+        const matchArea = !areaFilter || p.area === areaFilter;
+        return matchSearch && matchCuisine && matchArea;
+      });
+    }
+
+    function applyFilters() {
+      if (isListView) {
+        renderList();
+      } else {
+        renderMap();
+      }
+    }
+
+    // ── Filter bar ────────────────────────────────────────────────────────────
+    function buildFilters() {
+      // Cuisine pills
+      const cuisines = [...new Set(allPlaces.map(p => p.cuisine_type).filter(Boolean))].sort();
+      const row = document.getElementById("cuisine-row");
+      row.innerHTML = "";
+
+      const allPill = document.createElement("button");
+      allPill.className = "pill active";
+      allPill.textContent = "All";
+      allPill.dataset.cuisine = "";
+      row.appendChild(allPill);
+
+      cuisines.forEach(c => {
+        const pill = document.createElement("button");
+        pill.className = "pill";
+        pill.textContent = c;
+        pill.dataset.cuisine = c;
+        row.appendChild(pill);
+      });
+
+      // Area dropdown — inject after cuisine row if areas exist
+      const areas = [...new Set(allPlaces.map(p => p.area).filter(Boolean))].sort();
+      if (areas.length) {
+        let sel = document.getElementById("area-filter");
+        if (!sel) {
+          sel = document.createElement("select");
+          sel.id = "area-filter";
+          row.appendChild(sel);
+        }
+        sel.innerHTML = `<option value="">All areas</option>` +
+          areas.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join("");
+        sel.addEventListener("change", () => { areaFilter = sel.value; applyFilters(); });
+      }
+
+      // Pill click events
+      row.querySelectorAll(".pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+          row.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+          pill.classList.add("active");
+          cuisineFilter = pill.dataset.cuisine;
+          applyFilters();
+        });
+      });
+    }
+
+    // ── Map rendering ─────────────────────────────────────────────────────────
+    function renderMap() {
+      if (!map) return;
+
+      // Clear existing markers
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+
+      const filtered = getFiltered();
+      const bounds = new google.maps.LatLngBounds();
+      let hasBounds = false;
+
+      filtered.forEach(place => {
+        if (place.lat == null || place.lng == null) return;
+
+        const pos = { lat: place.lat, lng: place.lng };
+        bounds.extend(pos);
+        hasBounds = true;
+
+        const isVisited = place.status === "visited";
+        const marker = new google.maps.Marker({
+          position: pos,
+          map,
+          title: place.name,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: isVisited ? "#34A853" : "#FF6B35",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#ffffff",
+            scale: 9,
+          },
+          zIndex: isVisited ? 1 : 2,
+        });
+
+        marker.addListener("click", () => showCard(place));
+        markers.push(marker);
+      });
+
+      if (hasBounds) {
+        map.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
+        // Don't zoom in too far for single pins
+        const listener = google.maps.event.addListener(map, "idle", () => {
+          if (map.getZoom() > 16) map.setZoom(16);
+          google.maps.event.removeListener(listener);
+        });
+      }
+    }
+
+    // ── List rendering ────────────────────────────────────────────────────────
+    function renderList() {
+      const listDiv = document.getElementById("list-view");
+      const filtered = getFiltered();
+
+      if (!filtered.length) {
+        listDiv.innerHTML = `<p class="empty-msg">No places match your filters 😅</p>`;
+        return;
+      }
+
+      // Group by area
+      const grouped = {};
+      filtered.forEach(p => {
+        const key = p.area || "Other";
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(p);
+      });
+
+      listDiv.innerHTML = Object.entries(grouped)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([area, places]) =>
+          `<div class="list-area-header">📍 ${esc(area)}</div>` +
+          places.map(p => {
+            const color = p.status === "visited" ? "var(--accent-green)" : "var(--accent-orange)";
+            const stars = p.rating ? "⭐".repeat(p.rating) : "";
+            return `<div class="list-item" data-id="${p.id}">
+              <div class="list-item-name">
+                <span class="status-dot" style="background:${color}"></span>${esc(p.name)}
+              </div>
+              <div class="list-item-meta">
+                ${p.cuisine_type ? `<span>${esc(p.cuisine_type)}</span>` : ""}
+                ${stars ? `<span>${stars}</span>` : ""}
+                ${p.area ? `<span>${esc(p.area)}</span>` : ""}
+              </div>
+            </div>`;
+          }).join("")
+        ).join("");
+
+      // List item → map flyover + card
+      listDiv.querySelectorAll(".list-item").forEach(item => {
+        item.addEventListener("click", () => {
+          const place = allPlaces.find(p => p.id === parseInt(item.dataset.id));
+          if (!place) return;
+
+          // Switch to map, show card, fly to pin
+          toggleView(false);
+          showCard(place);
+          if (map && place.lat != null && place.lng != null) {
+            map.panTo({ lat: place.lat, lng: place.lng });
+            if (map.getZoom() < 14) map.setZoom(14);
+          }
+        });
+      });
+    }
+
+    // ── Slide-up card ─────────────────────────────────────────────────────────
+    function showCard(place) {
+      const card = document.getElementById("card");
+      const overlay = document.getElementById("card-overlay");
+      const content = document.getElementById("card-content");
+
+      const stars = place.rating ? "⭐".repeat(place.rating) : "";
+      const statusClass = place.status;
+      const statusLabel = place.status === "visited" ? "✅ Visited" : "🔖 Wishlist";
+
+      let html = `
+        <h2>${esc(place.name)}</h2>
+        <div class="card-tags">
+          ${place.area ? `<span class="tag">${esc(place.area)}</span>` : ""}
+          ${place.cuisine_type ? `<span class="tag">${esc(place.cuisine_type)}</span>` : ""}
+          <span class="tag ${statusClass}">${statusLabel}</span>
+        </div>
+        <p class="card-address">${esc(place.address)}</p>
+      `;
+
+      if (place.notes) {
+        html += `<p class="card-notes">📝 ${esc(place.notes)}</p>`;
+      }
+
+      if (stars) {
+        html += `<div class="card-rating">${stars}`;
+        if (place.review) {
+          html += `<p class="card-review">"${esc(place.review)}"</p>`;
+        }
+        html += `</div>`;
+      }
+
+      html += `<a class="maps-btn" href="${esc(place.maps_url)}" target="_blank">📍 Open in Google Maps</a>`;
+
+      content.innerHTML = html;
+      overlay.style.display = "block";
+      card.style.display = "block";
+      // Trigger CSS transition
+      requestAnimationFrame(() => card.classList.add("open"));
+    }
+
+    function closeCard() {
+      const card = document.getElementById("card");
+      const overlay = document.getElementById("card-overlay");
+      card.classList.remove("open");
+      overlay.style.display = "none";
+      setTimeout(() => { card.style.display = "none"; }, 260);
+    }
+
+    document.getElementById("card-overlay").addEventListener("click", closeCard);
+    document.getElementById("card-handle").addEventListener("click", closeCard);
+
+    // ── View toggle ───────────────────────────────────────────────────────────
+    document.getElementById("view-toggle").addEventListener("click", () => {
+      toggleView(!isListView);
+    });
+
+    function toggleView(showList) {
+      isListView = showList;
+      document.getElementById("map").style.display = showList ? "none" : "block";
+      document.getElementById("list-view").style.display = showList ? "block" : "none";
+      document.getElementById("legend").style.display = showList ? "none" : "";
+      document.getElementById("view-toggle").textContent = showList ? "🗺 Map" : "☰ List";
+      closeCard();
+      if (showList) renderList();
+      else renderMap();
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+    document.getElementById("search").addEventListener("input", applyFilters);
+
+    // ── Google Maps callback ──────────────────────────────────────────────────
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 1.3521, lng: 103.8198 },  // Singapore
+        zoom: 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_CENTER,
+        },
+        styles: [
+          { featureType: "poi", stylers: [{ visibility: "off" }] },
+        ],
+      });
+
+      fetchWishlist();
+    }
+  </script>
+
+  <!-- Google Maps JS — API key injected server-side -->
+  <script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key=__GOOGLE_MAPS_API_KEY__&callback=initMap&loading=async"
+  ></script>
+</body>
+</html>

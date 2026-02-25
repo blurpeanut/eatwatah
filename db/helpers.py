@@ -280,6 +280,7 @@ async def save_wishlist_entry(
     lng: float | None,
     any_branch: bool = False,
     notes: str | None = None,
+    cuisine_type: str | None = None,
 ) -> WishlistEntry | None:
     """Persist a wishlist entry. Returns the saved entry or None on failure."""
     try:
@@ -292,6 +293,7 @@ async def save_wishlist_entry(
                     name=name,
                     address=address,
                     area=area,
+                    cuisine_type=cuisine_type,
                     lat=lat,
                     lng=lng,
                     any_branch=any_branch,

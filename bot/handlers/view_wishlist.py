@@ -1,7 +1,8 @@
 import html
 import logging
+import os
 
-from telegram import Message, Chat, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Chat, Update, WebAppInfo
 from telegram.ext import ContextTypes
 
 from db.context import is_private_chat
@@ -104,7 +105,20 @@ async def show_wishlist(message: Message, chat, user) -> None:
                     + note_line
                 )
 
+        # ── Text list ──────────────────────────────────────────────────────
         await message.reply_html("\n".join(lines))
+
+        # ── Map button (only if WEBAPP_BASE_URL is configured) ─────────────
+        webapp_base = os.getenv("WEBAPP_BASE_URL", "").rstrip("/")
+        if webapp_base:
+            webapp_url = f"{webapp_base}/webapp/index.html"
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Open map", web_app=WebAppInfo(url=webapp_url))
+            ]])
+            await message.reply_text(
+                "Explore your spots on the map 👇",
+                reply_markup=keyboard,
+            )
 
     except Exception as e:
         logger.error("show_wishlist error for user %s: %s", user.id, e)
