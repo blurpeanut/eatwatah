@@ -20,6 +20,7 @@ from db.helpers import (
     get_entry_by_place_and_chat,
     get_wishlist_entries,
     log_error,
+    reactivate_if_needed,
     save_visit,
     update_wishlist_status,
 )
@@ -87,6 +88,7 @@ async def visit_cmd_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         chat_type=chat.type,
         chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
     )
+    await reactivate_if_needed(user.id, chat.id, context.bot)
 
     context.user_data.pop("visit", None)  # clear any stale state
     vd = _visit_data(context)

@@ -5,7 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from db.context import is_private_chat
-from db.helpers import ensure_user_and_chat, log_error
+from db.helpers import ensure_user_and_chat, log_error, reactivate_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             chat_type=chat.type,
             chat_name=None if is_private else (chat.title or "Group"),
         )
+        await reactivate_if_needed(user.id, chat.id, context.bot)
 
         text = _main_help_text(
             in_group=not is_private,

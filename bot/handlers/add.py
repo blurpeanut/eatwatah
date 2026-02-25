@@ -21,6 +21,7 @@ from db.helpers import (
     is_duplicate_entry,
     is_first_ever_add,
     log_error,
+    reactivate_if_needed,
     save_note,
     save_wishlist_entry,
 )
@@ -52,6 +53,7 @@ async def add_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         chat_type=chat.type,
         chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
     )
+    await reactivate_if_needed(user.id, chat.id, context.bot)
 
     # Step 0 — validate input
     query_text = " ".join(context.args).strip() if context.args else ""

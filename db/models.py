@@ -26,6 +26,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_deactivated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Chat(Base):

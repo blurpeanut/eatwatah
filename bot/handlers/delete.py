@@ -19,6 +19,7 @@ from db.helpers import (
     get_entry_by_id,
     get_wishlist_entries,
     log_error,
+    reactivate_if_needed,
     soft_delete_entry,
 )
 
@@ -43,6 +44,7 @@ async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             chat_type=chat.type,
             chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
         )
+        await reactivate_if_needed(user.id, chat.id, context.bot)
 
         entries = await get_wishlist_entries(chat.id)
 

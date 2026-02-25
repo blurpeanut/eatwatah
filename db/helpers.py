@@ -482,6 +482,55 @@ async def get_visits_for_chat(chat_id: int | str) -> list[dict]:
         return []
 
 
+# ── Account deactivation ──────────────────────────────────────────────────────
+
+async def reactivate_if_needed(
+    telegram_id: int | str,
+    chat_id: int | str,
+    bot,
+) -> bool:
+    """Reactivate a deactivated user if needed.
+
+    Returns True if the user was reactivated (is_deactivated was True → set False,
+    welcome-back message sent). Returns False in all other cases.
+    Never raises.
+
+    Edge cases handled:
+    - User does not exist: return False (new user, /start will register them)
+    - User is_deleted: return False (permanent deletion, do not touch)
+    - User is active: return False (no-op)
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            try:
+                user = await session.scalar(
+                    select(User).where(User.telegram_id == str(telegram_id))
+                )
+                if user is None:
+                    return False
+                if user.is_deleted:
+                    return False
+                if user.is_deactivated:
+                    user.is_deactivated = False
+                    await session.commit()
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=(
+                            "👋 Welcome back! Your account has been reactivated "
+                            "and your wishlist is still here. Carrying on..."
+                        ),
+                    )
+                    return True
+                return False
+            except Exception as e:
+                await session.rollback()
+                logger.error("reactivate_if_needed error: %s", e)
+                return False
+    except Exception as e:
+        logger.error("reactivate_if_needed session error: %s", e)
+        return False
+
+
 # ── Account deletion ──────────────────────────────────────────────────────────
 
 async def anonymise_and_delete_account(telegram_id: int | str) -> bool:

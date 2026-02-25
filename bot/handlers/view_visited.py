@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from db.context import is_private_chat
-from db.helpers import ensure_user_and_chat, get_visits_for_chat, log_error
+from db.helpers import ensure_user_and_chat, get_visits_for_chat, log_error, reactivate_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ async def view_visited_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             chat_type=chat.type,
             chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
         )
+        await reactivate_if_needed(user.id, chat.id, context.bot)
 
         rows = await get_visits_for_chat(chat.id)
 

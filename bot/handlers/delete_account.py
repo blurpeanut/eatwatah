@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from db.context import is_private_chat
-from db.helpers import anonymise_and_delete_account, ensure_user_and_chat, log_error
+from db.helpers import anonymise_and_delete_account, ensure_user_and_chat, log_error, reactivate_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ async def delete_account_handler(update: Update, context: ContextTypes.DEFAULT_T
         chat_type=chat.type,
         chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
     )
+    await reactivate_if_needed(user.id, chat.id, context.bot)
 
     keyboard = [[
         InlineKeyboardButton("Yes, delete my data 🗑", callback_data="da_confirm"),

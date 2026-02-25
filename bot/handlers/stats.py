@@ -4,7 +4,7 @@ import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from db.helpers import get_admin_stats, log_error
+from db.helpers import get_admin_stats, log_error, reactivate_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     developer_id = os.getenv("DEVELOPER_TELEGRAM_ID", "")
     if str(user.id) != developer_id:
         return
+    await reactivate_if_needed(user.id, chat.id, context.bot)
 
     try:
         s = await get_admin_stats()

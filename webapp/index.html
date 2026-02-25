@@ -296,6 +296,28 @@
       font-size: 15px;
     }
 
+    /* ── Loading bar ─────────────────────────────────────────── */
+    #loading-bar {
+      height: 3px;
+      background: var(--secondary-bg);
+      display: none;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #loading-bar.active { display: block; }
+    #loading-bar::after {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 40%;
+      background: var(--btn);
+      animation: loading-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes loading-slide {
+      0%   { margin-left: -40%; }
+      100% { margin-left: 100%; }
+    }
+
     /* ── Error / loading states ──────────────────────────────── */
     #status-msg {
       flex: 1;
@@ -324,6 +346,9 @@
       <!-- Pills injected by JS -->
     </div>
   </div>
+
+  <!-- Loading bar -->
+  <div id="loading-bar"></div>
 
   <!-- Pin legend -->
   <div id="legend">
@@ -378,6 +403,7 @@
     }
 
     function showStatus(emoji, text) {
+      document.getElementById("loading-bar").classList.remove("active");
       document.getElementById("map").style.display = "none";
       document.getElementById("list-view").style.display = "none";
       document.getElementById("legend").style.display = "none";
@@ -392,6 +418,14 @@
       document.getElementById("legend").style.display = "";
     }
 
+    function showLoading() {
+      document.getElementById("loading-bar").classList.add("active");
+    }
+
+    function hideLoading() {
+      document.getElementById("loading-bar").classList.remove("active");
+    }
+
     // ── Data fetch ────────────────────────────────────────────────────────────
     async function fetchWishlist() {
       if (!chatId) {
@@ -399,7 +433,7 @@
         return;
       }
 
-      showStatus("🍜", "Loading your wishlist...");
+      showLoading();
 
       try {
         const resp = await fetch(`/api/wishlist?chat_id=${encodeURIComponent(chatId)}`, {
@@ -416,13 +450,13 @@
         }
 
         allPlaces = await resp.json();
+        hideLoading();
 
         if (!allPlaces.length) {
           showStatus("📋", "Your wishlist is empty! Use /add in the bot to start saving places.");
           return;
         }
 
-        hideStatus();
         buildFilters();
         renderMap();
 

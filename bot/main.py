@@ -24,6 +24,7 @@ from bot.handlers.delete import (
     delete_search_conversation_handler,
     delete_show_confirm,
 )
+from bot.handlers.deactivate import deactivate_handler
 from bot.handlers.delete_account import (
     delete_account_cancel,
     delete_account_confirm,
@@ -59,6 +60,7 @@ async def post_init(application: Application) -> None:
         BotCommand("ask",           "Get AI-powered food recommendations"),
         BotCommand("delete",        "Remove a spot from your list"),
         BotCommand("deleteaccount", "Delete your account"),
+        BotCommand("deactivate",    "Pause your account"),
     ])
     logger.info("eatwatah bot is up and running")
 
@@ -169,6 +171,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("delete",        delete_handler))
     app.add_handler(CommandHandler("ask",           ask_handler))
     app.add_handler(CommandHandler("deleteaccount", delete_account_handler))
+    app.add_handler(CommandHandler("deactivate",    deactivate_handler))
 
     # ── ConversationHandlers (must be before generic CallbackQueryHandlers) ───
     app.add_handler(add_conversation_handler)      # /add

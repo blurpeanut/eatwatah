@@ -10,6 +10,7 @@ from db.helpers import (
     is_duplicate_entry,
     is_first_ever_add,
     log_error,
+    reactivate_if_needed,
     save_wishlist_entry,
 )
 from bot.handlers.view_wishlist import show_wishlist
@@ -44,6 +45,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             chat_type=chat.type,
             chat_name=None if is_private else (chat.title or "Group"),
         )
+        await reactivate_if_needed(user.id, chat.id, context.bot)
 
         if is_new:
             await _send_new_user_welcome(update, user)

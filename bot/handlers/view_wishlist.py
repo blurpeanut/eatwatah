@@ -11,6 +11,7 @@ from db.helpers import (
     get_user_display_names,
     get_wishlist_entries,
     log_error,
+    reactivate_if_needed,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,4 +133,12 @@ async def view_wishlist_handler(update: Update, context: ContextTypes.DEFAULT_TY
     user = update.effective_user
     chat = update.effective_chat
     logger.info("/viewwishlist called by user %s in chat %s", user.id, chat.id)
+    await ensure_user_and_chat(
+        telegram_id=user.id,
+        display_name=user.full_name or user.username or "Friend",
+        chat_id=chat.id,
+        chat_type=chat.type,
+        chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
+    )
+    await reactivate_if_needed(user.id, chat.id, context.bot)
     await show_wishlist(update.message, chat, user)

@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from db.context import is_private_chat
-from db.helpers import ensure_user_and_chat, log_error
+from db.helpers import ensure_user_and_chat, log_error, reactivate_if_needed
 from services.recommendation_service import get_recommendations
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ async def ask_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         chat_type=chat.type,
         chat_name=None if is_private_chat(chat.id, user.id) else (chat.title or "Group"),
     )
+    await reactivate_if_needed(user.id, chat.id, context.bot)
 
     query_text = " ".join(context.args).strip() if context.args else ""
     if not query_text:
