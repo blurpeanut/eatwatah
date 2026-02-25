@@ -77,16 +77,29 @@ async def show_wishlist(message: Message, chat, user) -> None:
             )
             return
 
-        # Batch-fetch user display names
+        webapp_base = os.getenv("WEBAPP_BASE_URL", "").strip().rstrip("/")
+
+        # ── WebApp mode: just open the map ─────────────────────────────────
+        if webapp_base:
+            count = len(entries)
+            webapp_url = f"{webapp_base}/webapp/index.html"
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Open map", web_app=WebAppInfo(url=webapp_url))
+            ]])
+            await message.reply_text(
+                f"You've got {count} place{'s' if count != 1 else ''} saved 👇",
+                reply_markup=keyboard,
+            )
+            return
+
+        # ── Fallback: text list (no WebApp configured) ─────────────────────
         added_by_ids = list({e.added_by for e in entries})
         display_names = await get_user_display_names(added_by_ids)
 
-        # Group by region
         grouped: dict[str, list] = {r: [] for r in REGION_ORDER}
         for entry in entries:
             grouped[_get_region(entry.area)].append(entry)
 
-        # Build message text
         lines = [f"📋 <b>Your Wishlist</b> — {len(entries)} place{'s' if len(entries) != 1 else ''}\n"]
 
         for region in REGION_ORDER:
@@ -105,20 +118,7 @@ async def show_wishlist(message: Message, chat, user) -> None:
                     + note_line
                 )
 
-        # ── Text list ──────────────────────────────────────────────────────
         await message.reply_html("\n".join(lines))
-
-        # ── Map button (only if WEBAPP_BASE_URL is configured) ─────────────
-        webapp_base = os.getenv("WEBAPP_BASE_URL", "").rstrip("/")
-        if webapp_base:
-            webapp_url = f"{webapp_base}/webapp/index.html"
-            keyboard = InlineKeyboardMarkup([[
-                InlineKeyboardButton("🗺 Open map", web_app=WebAppInfo(url=webapp_url))
-            ]])
-            await message.reply_text(
-                "Explore your spots on the map 👇",
-                reply_markup=keyboard,
-            )
 
     except Exception as e:
         logger.error("show_wishlist error for user %s: %s", user.id, e)
