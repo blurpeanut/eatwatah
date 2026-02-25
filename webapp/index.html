@@ -540,21 +540,30 @@
     }
 
     function _pillIcon(name, color) {
-      const MAX = 18;
+      const MAX = 20;
       const label = name.length > MAX ? name.slice(0, MAX - 1) + "\u2026" : name;
-      const W = Math.round(label.length * 6.8) + 28;
-      const H = 22, tip = 7, mid = W / 2;
+      const textW = Math.round(label.length * 6.5);
+      const dotR = 8, dotCY = 11, dotCX = dotR + 1;
+      const labelX = dotCX + dotR + 4;
+      const labelPad = 8, labelH = 20, labelY = dotCY - labelH / 2;
+      const labelW = textW + labelPad * 2;
+      const W = labelX + labelW, H = dotCY * 2;
       const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H + tip}">` +
-        `<rect x="0" y="0" width="${W}" height="${H}" rx="${H / 2}" fill="${color}" stroke="white" stroke-width="1.5"/>` +
-        `<polygon points="${mid - 5},${H - 1} ${mid + 5},${H - 1} ${mid},${H + tip}" fill="${color}"/>` +
-        `<text x="${mid}" y="${H * 0.67}" text-anchor="middle" dominant-baseline="middle"` +
-        ` font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="white">` +
-        _svgEsc(label) + `</text></svg>`;
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
+        // Semi-transparent label background
+        `<rect x="${labelX}" y="${labelY}" width="${labelW}" height="${labelH}" rx="${labelH / 2}"` +
+        ` fill="rgba(0,0,0,0.55)"/>` +
+        // Solid dot
+        `<circle cx="${dotCX}" cy="${dotCY}" r="${dotR}" fill="${color}" stroke="white" stroke-width="2"/>` +
+        // Name text
+        `<text x="${labelX + labelPad + textW / 2}" y="${dotCY}" text-anchor="middle" dominant-baseline="middle"` +
+        ` font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="white">` +
+        _svgEsc(label) + `</text>` +
+        `</svg>`;
       return {
         url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
-        scaledSize: new google.maps.Size(W, H + tip),
-        anchor: new google.maps.Point(mid, H + tip),
+        scaledSize: new google.maps.Size(W, H),
+        anchor: new google.maps.Point(dotCX, dotCY),  // anchor at dot centre
       };
     }
 

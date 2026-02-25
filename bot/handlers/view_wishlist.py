@@ -132,8 +132,8 @@ async def show_wishlist(message: Message, chat, user) -> None:
                         reply_markup=keyboard,
                     )
                     return
-                except Exception:
-                    pass  # fall through to text fallback
+                except Exception as e:
+                    logger.warning("Static map photo failed (Maps Static API enabled?): %s", e)
 
             await message.reply_text(caption, reply_markup=keyboard)
             return
