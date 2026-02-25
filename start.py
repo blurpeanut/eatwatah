@@ -2,19 +2,22 @@
 
 Used by Railway via `Procfile: web: python start.py`.
 For bot-only local dev, use `python bot/main.py` instead.
+
+Webhook mode (Railway): when WEBAPP_BASE_URL is set, Telegram pushes updates to
+/webhook — no polling, no Conflict errors on redeploy.
+Polling mode (local): when WEBAPP_BASE_URL is not set, falls back to long-polling.
 """
 import asyncio
 import logging
 import os
-import sys
 
 # Load env file BEFORE any other project imports so all modules see correct vars.
-# bot/main.py also calls load_dotenv() at its top level, but since override=True
-# on both sides, the second call (during import) wins — which is fine.
 from dotenv import load_dotenv
 load_dotenv(os.getenv("ENV_FILE", ".env"), override=True)
 
 import uvicorn
+from fastapi import Request
+from fastapi.responses import Response
 from telegram import Update
 
 from api.main import app as fastapi_app
@@ -34,26 +37,49 @@ async def run() -> None:
     ptb_app = build_app()
 
     port = int(os.getenv("PORT", 8000))
+    webapp_base = os.getenv("WEBAPP_BASE_URL", "").strip().rstrip("/")
+    use_webhook = bool(webapp_base)
+
+    # Register Telegram webhook endpoint on the FastAPI app
+    @fastapi_app.post("/webhook")
+    async def telegram_webhook(request: Request) -> Response:
+        try:
+            data = await request.json()
+            update = Update.de_json(data, ptb_app.bot)
+            await ptb_app.process_update(update)
+        except Exception as e:
+            logger.error("Webhook processing error: %s", e)
+        return Response(status_code=200)
+
     config = uvicorn.Config(
         fastapi_app,
         host="0.0.0.0",
         port=port,
         log_level="warning",
-        loop="none",          # use the existing asyncio event loop
+        loop="none",      # reuse the existing asyncio event loop
         lifespan="off",
     )
     server = uvicorn.Server(config)
 
     async with ptb_app:
         await ptb_app.start()
-        await ptb_app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-        logger.info("Bot started + FastAPI listening on port %d", port)
+
+        if use_webhook:
+            webhook_url = f"{webapp_base}/webhook"
+            await ptb_app.bot.set_webhook(url=webhook_url)
+            logger.info("Webhook mode: %s — FastAPI on port %d", webhook_url, port)
+        else:
+            await ptb_app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            logger.info("Polling mode — FastAPI on port %d", port)
 
         try:
             await server.serve()
         finally:
-            logger.info("Shutting down bot...")
-            await ptb_app.updater.stop()
+            logger.info("Shutting down...")
+            if use_webhook:
+                await ptb_app.bot.delete_webhook()
+            else:
+                await ptb_app.updater.stop()
             await ptb_app.stop()
 
 
