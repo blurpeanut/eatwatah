@@ -49,6 +49,40 @@ AREA_TO_REGION: dict[str, str] = {
 REGION_ORDER = ["Central", "East", "North", "North-East", "West", "Other"]
 
 
+def _build_static_map_url(entries, width: int = 600, height: int = 300) -> str | None:
+    """Build a Google Static Maps URL with orange (wishlist) and green (visited) pins."""
+    api_key = os.getenv("GOOGLE_PLACES_API_KEY", "")
+    if not api_key:
+        return None
+
+    with_coords = [e for e in entries if e.lat is not None and e.lng is not None]
+    if not with_coords:
+        return None
+
+    wishlist_pins = [e for e in with_coords if e.status == "wishlist"]
+    visited_pins  = [e for e in with_coords if e.status == "visited"]
+
+    marker_parts = []
+    if wishlist_pins:
+        coords = "|".join(f"{e.lat},{e.lng}" for e in wishlist_pins)
+        marker_parts.append(f"markers=color:orange|size:small|{coords}")
+    if visited_pins:
+        coords = "|".join(f"{e.lat},{e.lng}" for e in visited_pins)
+        marker_parts.append(f"markers=color:green|size:small|{coords}")
+
+    if not marker_parts:
+        return None
+
+    base = "https://maps.googleapis.com/maps/api/staticmap"
+    url = (
+        f"{base}?size={width}x{height}&scale=2&maptype=roadmap"
+        f"&style=feature:poi|visibility:off"
+        f"&{'&'.join(marker_parts)}"
+        f"&key={api_key}"
+    )
+    return url if len(url) <= 8192 else None
+
+
 def _get_region(area: str | None) -> str:
     if not area:
         return "Other"
@@ -80,17 +114,28 @@ async def show_wishlist(message: Message, chat, user) -> None:
 
         webapp_base = os.getenv("WEBAPP_BASE_URL", "").strip().rstrip("/")
 
-        # ── WebApp mode: just open the map ─────────────────────────────────
+        # ── WebApp mode: static map preview + open button ───────────────────
         if webapp_base:
             count = len(entries)
             webapp_url = f"{webapp_base}/webapp/index.html"
             keyboard = InlineKeyboardMarkup([[
                 InlineKeyboardButton("🗺 Open map", web_app=WebAppInfo(url=webapp_url))
             ]])
-            await message.reply_text(
-                f"You've got {count} place{'s' if count != 1 else ''} saved 👇",
-                reply_markup=keyboard,
-            )
+            caption = f"You've got {count} place{'s' if count != 1 else ''} saved 👇"
+
+            static_map_url = _build_static_map_url(entries)
+            if static_map_url:
+                try:
+                    await message.reply_photo(
+                        photo=static_map_url,
+                        caption=caption,
+                        reply_markup=keyboard,
+                    )
+                    return
+                except Exception:
+                    pass  # fall through to text fallback
+
+            await message.reply_text(caption, reply_markup=keyboard)
             return
 
         # ── Fallback: text list (no WebApp configured) ─────────────────────
