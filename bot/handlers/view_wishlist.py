@@ -172,7 +172,10 @@ async def _build_static_map_image(entries) -> bytes | None:
         LABEL_BG = (0, 0, 0, 150)
 
         for entry in with_coords:
-            px, py = _to_pixel(entry.lat, entry.lng, center_lat, center_lng, zoom, PIX_W, PIX_H)
+            # _to_pixel works in logical pixels (IMG_W×IMG_H); multiply by SCALE
+            # to get actual pixel position in the retina image (PIX_W×PIX_H).
+            _lx, _ly = _to_pixel(entry.lat, entry.lng, center_lat, center_lng, zoom, IMG_W, IMG_H)
+            px, py = _lx * SCALE, _ly * SCALE
             if not (DOT_R <= px <= PIX_W - DOT_R and DOT_R <= py <= PIX_H - DOT_R):
                 continue
 
