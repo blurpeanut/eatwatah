@@ -55,8 +55,8 @@ async def run() -> None:
         fastapi_app,
         host="0.0.0.0",
         port=port,
-        log_level="warning",
-        loop="none",      # reuse the existing asyncio event loop
+        log_level="info",     # temporarily verbose so we can see if it binds
+        loop="none",          # reuse the existing asyncio event loop
         lifespan="off",
     )
     server = uvicorn.Server(config)
