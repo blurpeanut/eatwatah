@@ -137,18 +137,12 @@ async def _build_static_map_image(entries) -> bytes | None:
 
     center_lat, center_lng, zoom = _fit_zoom(with_coords, IMG_W, IMG_H)
 
-    # Build URL — tiny invisible markers so the API renders the right viewport
-    # (we draw our own markers with PIL below)
-    marker_parts = []
-    for e in with_coords:
-        marker_parts.append(f"markers=size:tiny|color:0x00000000|{e.lat},{e.lng}")
-
+    # Plain base map — no markers in the URL, PIL draws everything
     url = (
         f"https://maps.googleapis.com/maps/api/staticmap"
         f"?size={IMG_W}x{IMG_H}&scale={SCALE}"
         f"&center={center_lat},{center_lng}&zoom={zoom}"
         f"&maptype=roadmap&style=feature:poi|visibility:off"
-        f"&{'&'.join(marker_parts)}"
         f"&key={api_key}"
     )
 
