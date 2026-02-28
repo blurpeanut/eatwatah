@@ -246,7 +246,7 @@ async def show_wishlist(message: Message, chat, user) -> None:
         # ── WebApp mode: static map preview + open button ───────────────────
         if webapp_base:
             count = len(entries)
-            webapp_url = f"{webapp_base}/webapp/index.html"
+            webapp_url = f"{webapp_base}/webapp/index.html?chat_id={chat.id}"
             keyboard = InlineKeyboardMarkup([[
                 InlineKeyboardButton("🗺 Open map", web_app=WebAppInfo(url=webapp_url))
             ]])

@@ -385,7 +385,10 @@
     const initDataUnsafe = tg.initDataUnsafe || {};
     const chatInfo = initDataUnsafe.chat || {};
     const userInfo = initDataUnsafe.user || {};
-    const chatId = String(chatInfo.id || userInfo.id || "");
+    // chat_id is passed explicitly in the URL by the bot (Telegram only populates
+    // initDataUnsafe.chat for attachment-menu launches, not inline keyboard buttons).
+    const urlChatId = new URLSearchParams(window.location.search).get("chat_id");
+    const chatId = urlChatId || String(chatInfo.id || userInfo.id || "");
 
     // ── State ─────────────────────────────────────────────────────────────────
     let allPlaces = [];

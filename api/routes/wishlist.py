@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from api.auth import validate_init_data
 from db.connection import AsyncSessionLocal
-from db.models import Visit, WishlistEntry
+from db.models import Chat, Visit, WishlistEntry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,12 +35,30 @@ async def get_wishlist(
             detail="Session expired. Close and reopen from Telegram.",
         )
 
-    # ── Security: chat_id must belong to this user ─────────────────────────
+    # ── Security: chat_id must be owned by this user ──────────────────────
     user = data.get("user") or {}
     chat = data.get("chat") or {}
     allowed_ids = {str(user.get("id", "")), str(chat.get("id", ""))} - {""}
+
     if chat_id not in allowed_ids:
-        raise HTTPException(status_code=403, detail="Access denied.")
+        # For inline-keyboard WebApp launches from groups, Telegram does NOT include
+        # chat in initData (only attachment-menu launches get it). The bot embeds
+        # chat_id in the URL explicitly. Accept group chat_ids (negative integers)
+        # that exist in our Chats table — the entry is created when the user runs
+        # /viewwishlist in that group, so presence in the table proves bot activity.
+        try:
+            chat_id_int = int(chat_id)
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access denied.")
+        if chat_id_int >= 0:
+            # Positive IDs must equal the user's own ID — already failed above.
+            raise HTTPException(status_code=403, detail="Access denied.")
+        async with AsyncSessionLocal() as session:
+            known_chat = await session.scalar(
+                select(Chat).where(Chat.chat_id == chat_id)
+            )
+        if not known_chat:
+            raise HTTPException(status_code=403, detail="Access denied.")
 
     # ── DB query ───────────────────────────────────────────────────────────
     try:
