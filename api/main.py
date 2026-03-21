@@ -3,9 +3,11 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from api.routes.wishlist import router as wishlist_router
+from api.wishlist_routes import router as wishlist_web_router
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +15,20 @@ _WEBAPP_PATH = Path(__file__).parent.parent / "webapp" / "index.html"
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "https://eatwatah.com",
+        "https://www.eatwatah.com",
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 app.include_router(wishlist_router)
+app.include_router(wishlist_web_router)
 
 
 @app.get("/webapp/index.html", response_class=HTMLResponse)

@@ -1,37 +1,41 @@
 # eatwatah — Claude Project Context
 
 ## What is eatwatah
-A Telegram bot for F&B discovery and recommendations built 
-for young Singaporeans. Users can build a shared wishlist 
-of food spots, log visits with ratings and reviews, and get 
+A Telegram bot for F&B discovery and recommendations built
+for young Singaporeans. Users can build a shared wishlist
+of food spots, log visits with ratings and reviews, and get
 AI-powered personalised recommendations via /ask.
 
-Rebuilt from a working prototype called Date Darling which 
+Rebuilt from a working prototype called Date Darling which
 had these limitations:
 - Google Sheets as the only database (single sheet, not scalable)
 - Only 2 hardcoded users
 - No group chat support
 - Silent crashes with zero error handling
 
-eatwatah is the proper rebuild — scalable, multi-user, 
+eatwatah is the proper rebuild — scalable, multi-user,
 multi-group, with a real database and AI layer.
 
 ---
 
 ## Full PRD
-Two PRD files exist. Read the correct one for the feature you are implementing:
+Three PRD files exist. Read the correct one for the feature you are implementing:
 
-/docs/eatwatah_v2_prd.md — V2 source of truth (current)
+/docs/eatwatah_v3_prd.md — V3 source of truth (current)
+Use this for: domain setup, Telegram Mini App registration,
+group /viewwishlist deep link, admin dashboard, CommandLogs.
+
+/docs/eatwatah_v2_prd.md — V2 source of truth (previous)
 Use this for: /start welcome copy, /viewwishlist WebApp,
 area grouping fix, /deactivate.
 
 /docs/eatwatah_prd.md — V1 source of truth (historical reference)
 Use this for: schema (Section 4), error philosophy (Section 9),
 bot personality (Section 1.5), privacy rules (Section 7).
-V1 spec is authoritative for anything not covered in V2 PRD.
+V1 spec is authoritative for anything not covered in V2 or V3 PRD.
 
-Where V2 PRD explicitly contradicts V1, V2 wins. See the
-"V1 Reversals" section below for the full list of deliberate changes.
+Where a later PRD explicitly contradicts an earlier one, the later one wins.
+See the "V1 Reversals" section below for the full list of deliberate changes.
 
 Never make architectural decisions that contradict the active PRD.
 
@@ -87,7 +91,7 @@ railway up
 ```
 
 **Rules:**
-- All V2 feature work is tested on dev first
+- All V3 feature work is tested on dev first
 - Only deploy to prod when dev is confirmed stable
 - Dev Railway project has its own DATABASE_URL — separate DB,
   no shared data with prod
@@ -114,13 +118,14 @@ eatwatah/
 ├── CLAUDE.md
 ├── docs/
 │   ├── eatwatah_prd.md        ← V1 PRD (historical reference)
-│   └── eatwatah_v2_prd.md     ← V2 PRD (current source of truth)
+│   ├── eatwatah_v2_prd.md     ← V2 PRD (previous)
+│   └── eatwatah_v3_prd.md     ← V3 PRD (current source of truth)
 ├── bot/
 │   ├── main.py              ← bot entry point
 │   └── handlers/
 │       ├── start.py
 │       ├── add.py
-│       ├── view_wishlist.py
+│       ├── view_wishlist.py  ← V3: branches private vs group
 │       ├── visit.py
 │       ├── view_visited.py
 │       ├── delete.py
@@ -129,18 +134,26 @@ eatwatah/
 │       └── delete_account.py
 ├── services/
 │   └── recommendation_service.py  ← AI engine, never import from /bot
-├── api/                     ← V2: FastAPI REST endpoints for WebApp
+├── api/                     ← FastAPI REST endpoints
+│   ├── auth.py              ← Telegram initData validation
+│   ├── main.py              ← FastAPI app, includes all routers
 │   └── routes/
-│       └── wishlist.py      ← serves /viewwishlist WebApp data
+│       ├── wishlist.py      ← serves /viewwishlist WebApp data
+│       └── admin.py         ← V3: /api/admin/stats + /api/admin/command-usage
 ├── jobs/                    ← reserved for V3: background scheduled jobs
-├── webapp/                  ← V2: single-file HTML/CSS/JS WebApp
-│   └── wishlist.html
+├── webapp/                  ← single-file HTML/CSS/JS WebApps
+│   ├── index.html           ← /viewwishlist WebApp (V3: reads start_param)
+│   └── admin.html           ← V3: ER diagram + stats + command bar chart
 ├── db/
 │   ├── connection.py        ← SQLAlchemy engine and session
-│   ├── models.py            ← all 6 table models
+│   ├── models.py            ← all 7 table models (incl. CommandLog)
+│   ├── helpers.py           ← DB helpers incl. log_command()
 │   ├── context.py           ← chat context detection utility
 │   └── migrations/          ← Alembic migration files
-├── pipelines/               ← reserved for v3 external signal pipeline
+├── scripts/                 ← one-off ops scripts (audit, backfill)
+├── tests/                   ← pytest test suite
+├── start.py                 ← unified entry: PTB bot + uvicorn FastAPI
+├── Procfile                 ← web: python start.py
 ├── .env                     ← never commit this
 ├── .gitignore
 └── requirements.txt
@@ -156,11 +169,11 @@ eatwatah/
    - Sends the holding message
    - Calls recommendation_service.get_recommendations(query, chat_id, user_id)
    - Formats and sends the returned results
-   This separation exists so future signal enrichment (V3)
-   can plug into the service layer without touching bot handlers.
+   This separation exists so future signal enrichment can plug
+   into the service layer without touching bot handlers.
 
 2. CONTEXT DETECTION ON EVERY COMMAND
-   Import and call is_private_chat(chat_id, user_id) from 
+   Import and call is_private_chat(chat_id, user_id) from
    db/context.py in every single command handler.
    If chat_id == user telegram_id → private DM context
    Else → group chat context
@@ -172,13 +185,13 @@ eatwatah/
    Never let a DB failure cause a silent crash.
 
 4. AUTO-REGISTRATION SAFETY NET
-   Every command handler must check if the user exists in 
+   Every command handler must check if the user exists in
    the Users table before processing.
    If not found: register them silently, then continue.
    Prevents crashes from users who bypassed /start.
 
 5. NEVER EXPOSE RAW ERRORS TO USERS
-   No Python exceptions, stack traces, or technical messages 
+   No Python exceptions, stack traces, or technical messages
    shown to users ever.
    Every failure has a friendly response in the bot's tone.
    All errors logged to the Errors table with full context.
@@ -188,7 +201,7 @@ eatwatah/
    Set status = 'deleted' on WishlistEntries.
    Visit history is never deleted under any circumstance.
 
-7. REST API: VALIDATE initData ON EVERY REQUEST
+7. REST API: VALIDATE initData ON EVERY WISHLIST REQUEST
    The FastAPI wishlist endpoint must validate the Telegram WebApp
    initData HMAC-SHA256 hash against TELEGRAM_BOT_TOKEN before
    returning any data. Return HTTP 403 on failure — never trust a
@@ -196,6 +209,18 @@ eatwatah/
    The endpoint must return both status='wishlist' AND status='visited'
    entries. The existing get_wishlist_entries helper only returns
    status='wishlist' and cannot be used as-is for the WebApp endpoint.
+
+8. ADMIN ROUTES REQUIRE HTTP BASIC AUTH
+   Every route under /admin and /api/admin/* must use FastAPI's
+   HTTPBasic dependency. Credentials come from env vars ADMIN_USERNAME
+   and ADMIN_PASSWORD — never hardcoded. Return 401 with
+   WWW-Authenticate: Basic on failure. No exceptions.
+
+9. COMMAND LOGGING IS FIRE-AND-FORGET
+   log_command(command, chat_id, user_id) in db/helpers.py must be
+   called in every handler after auto-registration and before main logic.
+   Wrap it in try/except and silently swallow all failures.
+   Never let command logging crash or slow a user-facing command.
 
 ---
 
@@ -216,21 +241,21 @@ Examples of correct tone:
   "⚠️ <place> already exists in your wishlist."
   "Shiok! Logged. The more you review, the better I get 🍜"
   "Hmm, nothing matching that. Try a different area?"
-  "Something went wrong on our end — not your fault! 
+  "Something went wrong on our end — not your fault!
    Try again in a bit 🙏"
 
 ---
 
 ## Error Philosophy
-Read Section 9 of the PRD for full error state specifications.
+Read Section 9 of the V1 PRD for full error state specifications.
 
 Summary:
 - Never go silent — every failure has a response
 - Never expose raw errors — always friendly human language
 - Never fake success — if something failed, say so honestly
-- Always log server-side — Errors table + Telegram alert 
+- Always log server-side — Errors table + Telegram alert
   to DEVELOPER_TELEGRAM_ID for critical failures
-- Retry logic: DB operations retry once silently before 
+- Retry logic: DB operations retry once silently before
   surfacing error to user
 
 ---
@@ -266,20 +291,58 @@ Auto-registration safety net on all commands
 
 ---
 
-## V2 Scope — Build These
-See /docs/eatwatah_v2_prd.md for full specs.
-
+## V2 Scope — Shipped
 /viewwishlist   WebApp redesign: map + search + filters + slide-up card
-/deactivate     new command — reversible account pause (not /deleteaccount)
+/deactivate     reversible account pause (not /deleteaccount)
 area grouping   reverse geocode lat/lng → URA planning area at /add time
                 + one-time backfill migration on existing entries
 middleware      auto-reactivation on every command for deactivated users
 REST API        FastAPI endpoints for WebApp (Telegram initData auth)
-/ask cleanup    remove follow-up prompt after every /ask response
-                (Section 4.3.2) — 3-line change in bot/handlers/ask.py
+/ask cleanup    removed follow-up prompt after every /ask response
+
+---
+
+## V3 Scope — Build These
+See /docs/eatwatah_v3_prd.md for full specs.
+
+### Domain + Mini App (ops, then code)
+domain          eatwatah.com → Cloudflare DNS → Railway prod custom domain
+mini app        Register @eatwatah_bot on BotFather as Telegram Mini App
+                Short name: wishlist → t.me/eatwatah_bot/wishlist
+
+### Bot handler change
+view_wishlist   Branch on chat type:
+                - Private chat: keep WebAppInfo inline button (V2 behaviour)
+                - Group chat: send url= button with MINI_APP_LINK?startapp=<chat_id>
+                Fallback: text list if MINI_APP_LINK not set (never crash)
+
+### WebApp change
+index.html      Update chat_id resolution order:
+                start_param → urlChatId → initDataUnsafe.chat.id → user.id
+                start_param = tg.initDataUnsafe.start_param (set by deep link)
+
+### Admin dashboard (eatwatah.com/admin)
+CommandLogs     New table: id, command, called_at, chat_id, user_id
+                Alembic migration required
+log_command()   New helper in db/helpers.py — fire-and-forget async insert
+                Called in all 9 handlers after auto-registration
+admin.py        GET /api/admin/stats — user/wishlist/visit/chat/error/sponsored counts
+                GET /api/admin/command-usage?days= — per-command call counts
+                Both routes: HTTP Basic Auth (ADMIN_USERNAME, ADMIN_PASSWORD)
+admin.html      Panel 1: static CSS ER diagram — all 7 tables + FK arrows
+                Panel 2: stat cards grid (fetches /api/admin/stats)
+                Panel 3: horizontal bar chart (fetches /api/admin/command-usage)
+                         time range selector: All time / 30 days / 7 days
+api/main.py     Include admin router, serve admin.html at /admin
+
+### New env vars (add to both Railway dashboards)
+WEBAPP_BASE_URL  https://eatwatah.com (prod) / Railway dev URL (dev)
+MINI_APP_LINK    t.me/eatwatah_bot/wishlist (prod) / t.me/eatwatah_dev_bot/wishlist (dev)
+ADMIN_USERNAME   e.g. "admin"
+ADMIN_PASSWORD   strong secret, set in Railway only
 
 ## Deferred — Do Not Build
-/ask upgrades   all V2 AI improvements deferred to V3: place_signals table,
+/ask upgrades   all V3 AI improvements deferred: place_signals table,
                 nightly Google Places job, review velocity scoring, sentiment
                 analysis, Popular Times, and the five engine improvements
                 (cuisine fingerprint, overdue wishlist, source labelling,
@@ -289,33 +352,39 @@ background job  scheduler for nightly place_signals job — deferred with it
 /deleteaccount  permanent data wipe (v2.1+ — PDPA critical, must ship
                 before scaling beyond friend group. V1 /deleteaccount
                 handles anonymisation; permanent wipe is a separate,
-                harder operation. See V2 PRD Section 8.4.)
+                harder operation.)
 Monthly recap   requires background scheduler — revisit when user base
                 justifies it
 Shareable URLs  eatwatah.com/u/sarah — data model TBD, page deferred
 /deals          depends on sponsored listings being live
-Full web product eatwatah.com — build after WebApp proven
+Landing page    eatwatah.com homepage — P2, spec in V3 PRD Section 8.
+                Non-blocking; ship Mini App + admin first.
 Instagram pipeline ToS risk, deferred indefinitely
 
 ---
 
-## Database — 6 Tables
+## Database — 7 Tables
 Full schema in Section 4 of V1 PRD and in db/models.py.
-PlaceSignals table is deferred to V3.
+PlaceSignals table is deferred.
 
 Quick reference:
-Users             telegram_id, display_name, joined_at, is_deleted
+Users             telegram_id, display_name, joined_at, is_deleted,
+                  is_deactivated
 Chats             chat_id, chat_type, chat_name, created_at
-WishlistEntries   chat_id, google_place_id, name, address, area,
-                  lat, lng, added_by, status, any_branch,
+WishlistEntries   id, chat_id (FK→Chats), google_place_id, name,
+                  address, area, cuisine_type, lat, lng,
+                  added_by (FK→Users), status, any_branch,
                   notes, date_added
-Visits            chat_id, google_place_id, logged_by, rating,
+Visits            id, chat_id (FK→Chats), google_place_id,
+                  logged_by (FK→Users), place_name, rating,
                   review, occasion, photos, visited_at
 SponsoredRestaurants  google_place_id, name, cuisine_tags, area,
                       deal_description, active_from,
                       active_until, is_active
-Errors            timestamp, telegram_id, chat_id, command,
+Errors            id, timestamp, telegram_id, chat_id, command,
                   error_type, message
+CommandLogs       id, command, called_at, chat_id (FK→Chats),
+                  user_id (FK→Users)   ← V3: new table
 
 ---
 
@@ -327,34 +396,20 @@ GOOGLE_PLACES_API_KEY    from Google Cloud Console
 OPENAI_API_KEY           from OpenAI
 DATABASE_URL             auto-provided by Railway PostgreSQL
 DEVELOPER_TELEGRAM_ID    your personal Telegram ID for alerts
+WEBAPP_BASE_URL          Railway URL or eatwatah.com — controls WebApp button
+MINI_APP_LINK            t.me/<bot>/wishlist — controls group deep link button
+ADMIN_USERNAME           HTTP Basic Auth username for /admin
+ADMIN_PASSWORD           HTTP Basic Auth password for /admin
 
 ---
 
 ## Privacy Rules
-Read Section 7 of the PRD for full details.
+Read Section 7 of the V1 PRD for full details.
 
 Summary:
 - Users retain rights over their own personal data
-- /deleteaccount anonymises user data, preserves group 
+- /deleteaccount anonymises user data, preserves group
   contributions as "Deleted User"
 - Never sell or share individual user data
 - Sponsored matching uses aggregated signals only
 - Singapore PDPA applies — inform users what is collected
-
----
-
-## Phase 2 — Do Not Build Yet
-After v1 is live, a separate background signal pipeline 
-will be built as a standalone service in /pipelines/.
-It will enrich /ask recommendations with external data from:
-- Reddit Singapore (official PRAW API)
-- TikTok (official Research API)  
-- Instagram (Meta Graph API)
-- Google Places (already in stack)
-
-The reason /services/recommendation_service.py must stay 
-decoupled from /bot/ is precisely so Phase 2 can plug into 
-the service layer without touching the bot handlers.
-
-Full Phase 2 spec in Section 12 of the PRD.
-Do not build any of this in v1.
